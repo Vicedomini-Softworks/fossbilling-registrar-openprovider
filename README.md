@@ -24,7 +24,7 @@ This project integrates the OpenProvider domain registrar with FOSSBilling, enab
 
 1. Clone this repository and copy the files to the root of your FOSSBilling installation:
    ```bash
-   git clone https://github.com/Devife/fossbilling-registrar-openprovider.git
+   git clone https://github.com/Vicedomini-Softworks/fossbilling-registrar-openprovider.git
    ```
 1. Navigate to the FOSSBilling admin panel.
 

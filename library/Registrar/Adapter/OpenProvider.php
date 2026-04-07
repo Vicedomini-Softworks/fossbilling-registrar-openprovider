@@ -1,570 +1,431 @@
 <?php
 
-/** phpcs:ignoreFile */
-
 /**
- * @copyright Devife (https://www.devife.com)
- * @license   MIT
+ * @copyright Vicedomini Softworks (https://www.vicedomini.com)
+ * @license   Apache-2.0
  *
- * This source file is subject to the MIT License that is bundled
+ * This source file is subject to the Apache 2.0 License that is bundled
  * with this source code in the file LICENSE
- * 
- * Support at support@devife.com
  */
-
-require_once __DIR__ . "/OpenProvider/API.php";
 
 class Registrar_Adapter_OpenProvider extends Registrar_AdapterAbstract
 {
-    private $config = array(
-        'Username'   => null,
+    private array $config = [
+        'Username' => null,
         'Password' => null,
-        'ApiUrl' => null
-    );
+        'ApiUrl'   => null,
+    ];
 
-    private const MODULE_VERSION = "0.1";
-    private const DIR_LOG = "logs";
-    private const FILE_LOG = "openprovider.log";
+    private ?string $accessToken = null;
 
     public function __construct($options)
     {
-        if (isset($options['Username']) && !empty($options['Username'])) {
+        if (!empty($options['Username'])) {
             $this->config['Username'] = $options['Username'];
-            unset($options['Username']);
         } else {
-            throw new Registrar_Exception('OpenProvider Registrar module error. Please update configuration parameter "Reseller Username" at "Configuration -> Domain registration"', [':domain_registrar' => 'OpenProvider', ':missing' => 'OpenProvider Username'], 3001);
+            throw new Registrar_Exception('OpenProvider error: missing "Username" in configuration.', [], 3001);
         }
 
-        if (isset($options['Password']) && !empty($options['Password'])) {
+        if (!empty($options['Password'])) {
             $this->config['Password'] = $options['Password'];
-            unset($options['Password']);
         } else {
-            throw new Registrar_Exception('OpenProvider Registrar module error. Please update configuration parameter "Reseller Password" at "Configuration -> Domain registration"', [':domain_registrar' => 'OpenProvider', ':missing' => 'OpenProvider Password'], 3001);
+            throw new Registrar_Exception('OpenProvider error: missing "Password" in configuration.', [], 3001);
         }
 
-        if (isset($options['ApiUrl']) && !empty($options['ApiUrl'])) {
-            $this->config['ApiUrl'] = $options['ApiUrl'];
-            unset($options['ApiUrl']);
+        if (!empty($options['ApiUrl'])) {
+            $this->config['ApiUrl'] = rtrim($options['ApiUrl'], '/');
         } else {
-            throw new Registrar_Exception('OpenProvider Registrar module error. Please update configuration parameter "API url" at "Configuration -> Domain registration"', [':domain_registrar' => 'OpenProvider', ':missing' => 'OpenProvider API Url'], 3001);
+            throw new Registrar_Exception('OpenProvider error: missing "ApiUrl" in configuration.', [], 3001);
         }
     }
-    /**
-     * Return array with configuration
-     */
 
-    public static function getConfig()
+    public static function getConfig(): array
     {
-        return array(
-            'label'     =>  'OpenProvider registrar',
-            'form'  => array(
-                'Username' => array(
+        return [
+            'label' => 'OpenProvider',
+            'form'  => [
+                'Username' => [
                     'text',
-                    array(
-                        'label' => 'Username',
-                        'description' => '',
+                    [
+                        'label'    => 'Username',
                         'required' => true,
-                    ),
-                ),
-                'Password' => array(
+                    ],
+                ],
+                'Password' => [
                     'password',
-                    array(
-                        'label' => 'Password',
-                        'description' => '',
+                    [
+                        'label'    => 'Password',
                         'required' => true,
-                    ),
-                ),
-                'ApiUrl' => array(
+                    ],
+                ],
+                'ApiUrl' => [
                     'text',
-                    array(
-                        'label' => 'Api url',
-                        'description' => '',
-                        'required' => true,
-                    ),
-                )
-            ),
-        );
-    }
-
-    public function getTlds(): array
-    {
-        return [];
-    }
-
-    public function registerDomain(Registrar_Domain $domain)
-    {
-        // Step 1: Ensure a customer handle exists
-        $customerHandle = $this->_getOrCreateCustomer($domain->getContactAdmin());
-
-        // Step 2: Prepare the domain registration data
-        $data = [
-            'domain' => [
-                'name' => $domain->getSld(),
-                'extension' => $this->_stripTld($domain),
-            ],
-            'period' => $domain->getRegistrationPeriod(),
-            'owner_handle' => $customerHandle,
-            'admin_handle' => $customerHandle,
-            'tech_handle' => $customerHandle,
-            'billing_handle' => $customerHandle,
-            'ns_group' => 'dns-openprovider',
-            'autorenew' => 'default'
-        ];
-
-        try {
-            $response = $this->_request('POST', '/domains', $data);
-            if ($response['code'] === 0) {
-                return true;
-            }
-            return false;
-        } catch (Exception $e) {
-            throw new Registrar_Exception('OpenProvider API Error: ' . $e->getMessage());
-        }
-    }
-
-    public function isDomainAvailable(Registrar_Domain $domain)
-    {
-        $data = [
-            'domains' => [
-                [
-                    'name' => $domain->getSld(),
-                    'extension' => $this->_stripTld($domain),
+                    [
+                        'label'       => 'API URL',
+                        'description' => 'Live: https://api.openprovider.eu | Sandbox: http://api.sandbox.openprovider.nl:8480',
+                        'required'    => true,
+                    ],
                 ],
             ],
         ];
-
-        try {
-            $response = $this->_request('POST', '/domains/check', $data);
-            if (!empty($response['data']['results']) && $response['data']['results'][0]['status'] === 'free') {
-                return true;
-            }
-            return false;
-        } catch (Exception $e) {
-            throw new Registrar_Exception('OpenProvider API Error: ' . $e->getMessage());
-        }
     }
 
-    public function isDomainCanBeTransferred(Registrar_Domain $domain)
+    public function isDomainAvailable(Registrar_Domain $domain): bool
     {
-        $data = [
+        $response = $this->_request('POST', '/domains/check', [
             'domains' => [
                 [
-                    'name' => $domain->getSld(),
+                    'name'      => $domain->getSld(),
                     'extension' => $this->_stripTld($domain),
                 ],
             ],
-        ];
+        ]);
 
-        $response = $this->_request('POST', '/domains/check', $data);
-        $result = $response['data']['results'][0] ?? [];
-        return isset($result['status']) && $result['status'] === 'active';
+        return ($response['data']['results'][0]['status'] ?? '') === 'free';
     }
 
-    public function transferDomain(Registrar_Domain $domain)
+    public function isDomaincanBeTransferred(Registrar_Domain $domain): bool
     {
-        // Step 1: Ensure a customer handle exists
+        $response = $this->_request('POST', '/domains/check', [
+            'domains' => [
+                [
+                    'name'      => $domain->getSld(),
+                    'extension' => $this->_stripTld($domain),
+                ],
+            ],
+        ]);
+
+        return ($response['data']['results'][0]['status'] ?? '') === 'active';
+    }
+
+    public function registerDomain(Registrar_Domain $domain): bool
+    {
         $customerHandle = $this->_getOrCreateCustomer($domain->getContactAdmin());
 
-        // Step 2: Prepare the domain transfer data
-        $data = [
+        $response = $this->_request('POST', '/domains', [
             'domain' => [
-                'name' => $domain->getSld(),
+                'name'      => $domain->getSld(),
                 'extension' => $this->_stripTld($domain),
             ],
-            'period' => $domain->getRegistrationPeriod(),
-            'owner_handle' => $customerHandle,
-            'admin_handle' => $customerHandle,
-            'tech_handle' => $customerHandle,
-            'billing_handle' => $customerHandle,
-            'ns_group' => 'dns-openprovider',
-            'autorenew' => 'default',
-            'auth_code' => $domain->getEpp(),
-        ];
+            'period'          => $domain->getRegistrationPeriod(),
+            'owner_handle'    => $customerHandle,
+            'admin_handle'    => $customerHandle,
+            'tech_handle'     => $customerHandle,
+            'billing_handle'  => $customerHandle,
+            'ns_group'        => 'dns-openprovider',
+            'autorenew'       => 'default',
+        ]);
 
-        $response = $this->_request('POST', '/domains/transfer', $data);
-        if ($response['code'] === 0) {
-            return true;
-        }
-
-        return false;
+        return ($response['code'] ?? -1) === 0;
     }
 
-    public function renewDomain(Registrar_Domain $domain)
+    public function renewDomain(Registrar_Domain $domain): bool
     {
         $domainId = $this->_getDomainId($domain);
 
-        $data = [
+        $response = $this->_request('POST', "/domains/{$domainId}/renew", [
             'domain' => [
-                'name' => $domain->getSld(),
+                'name'      => $domain->getSld(),
                 'extension' => $this->_stripTld($domain),
             ],
             'period' => $domain->getRegistrationPeriod(),
-        ];
+        ]);
 
-        $response = $this->_request('POST', "/domains/{$domainId}/renew", $data);
-        if ($response['code'] === 0) {
-            return true;
-        }
-
-        return false;
+        return ($response['code'] ?? -1) === 0;
     }
 
-    public function deleteDomain(Registrar_Domain $domain)
+    public function transferDomain(Registrar_Domain $domain): bool
+    {
+        $customerHandle = $this->_getOrCreateCustomer($domain->getContactAdmin());
+
+        $response = $this->_request('POST', '/domains/transfer', [
+            'domain' => [
+                'name'      => $domain->getSld(),
+                'extension' => $this->_stripTld($domain),
+            ],
+            'period'          => $domain->getRegistrationPeriod(),
+            'owner_handle'    => $customerHandle,
+            'admin_handle'    => $customerHandle,
+            'tech_handle'     => $customerHandle,
+            'billing_handle'  => $customerHandle,
+            'ns_group'        => 'dns-openprovider',
+            'autorenew'       => 'default',
+            'auth_code'       => $domain->getEpp(),
+        ]);
+
+        return ($response['code'] ?? -1) === 0;
+    }
+
+    public function deleteDomain(Registrar_Domain $domain): bool
     {
         $domainId = $this->_getDomainId($domain);
 
-        $data = [
+        $response = $this->_request('DELETE', "/domains/{$domainId}", [
             'skip_soft_quarantine' => false,
-            'force_delete' => false,
-            'type' => 'By user'
-        ];
+            'force_delete'         => false,
+            'type'                 => 'By user',
+        ]);
 
-        $response = $this->_request('DELETE', "/domains/{$domainId}", $data);
-        if ($response['code'] === 0) {
-            return true;
-        }
-
-        return false;
+        return ($response['code'] ?? -1) === 0;
     }
 
-    public function getEpp(Registrar_Domain $domain)
+    public function getDomainDetails(Registrar_Domain $domain): Registrar_Domain
     {
         $domainId = $this->_getDomainId($domain);
-
-        $response = $this->_request('GET', "/domains/{$domainId}/authcode");
-        return $response['data']['auth_code'] ?? null;
-    }
-
-    public function getDomainDetails(Registrar_Domain $domain)
-    {
-        $domainId = $this->_getDomainId($domain);
-
         $response = $this->_request('GET', "/domains/{$domainId}");
         $opDomain = $response['data'];
 
-        $domain->setRegistrationTime(strtotime($opDomain['creation_date']));
-        $domain->setExpirationTime(strtotime($opDomain['expiration_date']));
-        $domain->setPrivacyEnabled($opDomain['is_private_whois_enabled']);
-        $domain->setLocked($opDomain['is_locked']);
+        $domain->setRegisteredAt(new \DateTime($opDomain['creation_date']));
+        $domain->setExpiresAt(new \DateTime($opDomain['expiration_date']));
+        $domain->setPrivacyEnabled((bool) $opDomain['is_private_whois_enabled']);
+        $domain->setLocked((bool) $opDomain['is_locked']);
 
-        $nameservers = $opDomain['name_servers'];
-        if (isset($nameservers[0])) {
-            $domain->setNs1($nameservers[0]['name']);
-        }
-        if (isset($nameservers[1])) {
-            $domain->setNs2($nameservers[1]['name']);
-        }
-        if (isset($nameservers[2])) {
-            $domain->setNs3($nameservers[2]['name']);
-        }
-        if (isset($nameservers[3])) {
-            $domain->setNs4($nameservers[3]['name']);
+        $nameservers = $opDomain['name_servers'] ?? [];
+        $nsSetters = ['setNs1', 'setNs2', 'setNs3', 'setNs4'];
+        foreach ($nsSetters as $i => $setter) {
+            if (!empty($nameservers[$i]['name'])) {
+                $ns = new Registrar_Domain_Nameserver();
+                $ns->setHost($nameservers[$i]['name']);
+                $domain->{$setter}($ns);
+            }
         }
 
-        $registrarContact = new Registrar_Domain_Contact();
-        $adminContact = new Registrar_Domain_Contact();
-        $techContact = new Registrar_Domain_Contact();
-        $billingContact = new Registrar_Domain_Contact();
-
-        // Get customer info from the api
         $customer = $this->_getCustomer($opDomain['admin_handle']);
+        $contact  = $this->_hydrateContact(new Registrar_Domain_Contact(), $customer);
 
-        // Set contact data on our Domain obj using info from our API call
-        foreach (['Registrant', 'Admin', 'Tech', 'Billing'] as $contactType) {
-            $contact = $registrarContact;
-
-            if ($contactType == 'Admin') {
-                $contact = $adminContact;
-            }
-            if ($contactType == 'Tech') {
-                $contact = $techContact;
-            }
-            if ($contactType == 'Billing') {
-                $contact = $billingContact;
-            }
-
-            $contact->setFirstName($customer['name']['first_name']);
-            $contact->setLastName($customer['name']['last_name']);
-            $contact->setEmail($customer['email']);
-            $contact->setTelCc($customer['phone']['country_code']);
-            $contact->setTel($customer['phone']['subscriber_number']);
-            $contact->setAddress1($customer['address']['street']);
-            $contact->setCity($customer['address']['city']);
-            $contact->setState($customer['address']['state']);
-            $contact->setCountry($customer['address']['country']);
-            $contact->setZip($customer['address']['zipcode']);
-            $contact->setCompany(isset($customer['company_name']) ? $customer['company_name'] : '');
-        }
-
-        $domain->setContactRegistrar($registrarContact);
-        $domain->setContactAdmin($adminContact);
-        $domain->setContactTech($techContact);
-        $domain->setContactBilling($billingContact);
+        $domain->setContactRegistrar($contact);
+        $domain->setContactAdmin($contact);
+        $domain->setContactTech($contact);
+        $domain->setContactBilling($contact);
 
         return $domain;
     }
 
-    public function modifyNs(Registrar_Domain $domain)
+    public function getEpp(Registrar_Domain $domain): string
     {
-        // Step 1: Fetch the OpenProvider domain ID
+        $domainId = $this->_getDomainId($domain);
+        $response = $this->_request('GET', "/domains/{$domainId}/authcode");
+
+        return $response['data']['auth_code'] ?? '';
+    }
+
+    public function modifyNs(Registrar_Domain $domain): bool
+    {
         $domainId = $this->_getDomainId($domain);
 
         $ns = [];
-        $ns[] = ["name" => $domain->getNs1()];
-        $ns[] = ["name" => $domain->getNs2()];
-        if ($domain->getNs3()) {
-            $ns[] = ["name" => $domain->getNs3()];
-        }
-        if ($domain->getNs4()) {
-            $ns[] = ["name" => $domain->getNs4()];
+        foreach ([$domain->getNs1(), $domain->getNs2(), $domain->getNs3(), $domain->getNs4()] as $nameserver) {
+            if ($nameserver instanceof Registrar_Domain_Nameserver && $nameserver->getHost()) {
+                $ns[] = ['name' => $nameserver->getHost()];
+            }
         }
 
-        // Step 2: Prepare the request data
-        $data = [
-            'name_servers' => $ns,
-        ];
+        $response = $this->_request('PUT', "/domains/{$domainId}", ['name_servers' => $ns]);
 
-        // Step 3: Send the PUT request to update nameservers
-        $response = $this->_request('PUT', "/domains/{$domainId}", $data);
-        if ($response['code'] === 0) {
-            return true;
-        }
-
-        return false;
+        return ($response['code'] ?? -1) === 0;
     }
 
-    public function modifyContact(Registrar_Domain $domain)
+    public function modifyContact(Registrar_Domain $domain): bool
     {
-        // Step 1: Fetch the OpenProvider domain ID
-        $domainId = $this->_getDomainId($domain);
-
-        // Step 2: Get or create the customer handle
+        $domainId       = $this->_getDomainId($domain);
         $customerHandle = $this->_getOrCreateCustomer($domain->getContactAdmin(), true);
 
-        // Step 3: Prepare the request data
-        $data = [
-            'owner_handle' => $customerHandle,
-            'admin_handle' => $customerHandle,
-            'tech_handle' => $customerHandle,
+        $response = $this->_request('PUT', "/domains/{$domainId}", [
+            'owner_handle'   => $customerHandle,
+            'admin_handle'   => $customerHandle,
+            'tech_handle'    => $customerHandle,
             'billing_handle' => $customerHandle,
-        ];
+        ]);
 
-        // Step 4: Send the PUT request to update contact
-        $response = $this->_request('PUT', "/domains/{$domainId}", $data);
-        if ($response['code'] === 0) {
-            return true;
-        }
-
-        return false;
+        return ($response['code'] ?? -1) === 0;
     }
 
-    public function lock(Registrar_Domain $domain)
+    public function lock(Registrar_Domain $domain): bool
     {
         $domainId = $this->_getDomainId($domain);
+        $response = $this->_request('PUT', "/domains/{$domainId}", ['is_locked' => true]);
 
-        $data = [
-            'is_locked' => true,
-        ];
-
-        $response = $this->_request('PUT', "/domains/{$domainId}", $data);
-        if ($response['code'] === 0) {
-            return true;
-        }
-
-        return false;
+        return ($response['code'] ?? -1) === 0;
     }
 
-    public function unlock(Registrar_Domain $domain)
+    public function unlock(Registrar_Domain $domain): bool
     {
         $domainId = $this->_getDomainId($domain);
+        $response = $this->_request('PUT', "/domains/{$domainId}", ['is_locked' => false]);
 
-        $data = [
-            'is_locked' => false,
-        ];
-
-        $response = $this->_request('PUT', "/domains/{$domainId}", $data);
-        if ($response['code'] === 0) {
-            return true;
-        }
-
-        return false;
+        return ($response['code'] ?? -1) === 0;
     }
 
-    public function enablePrivacyProtection(Registrar_Domain $domain)
+    public function enablePrivacyProtection(Registrar_Domain $domain): bool
     {
         $domainId = $this->_getDomainId($domain);
+        $response = $this->_request('PUT', "/domains/{$domainId}", ['is_private_whois_enabled' => true]);
 
-        $data = [
-            'is_private_whois_enabled' => true,
-        ];
-
-
-        $response = $this->_request('PUT', "/domains/{$domainId}", $data);
-        if ($response['code'] === 0) {
-            return true;
-        }
-
-        return false;
+        return ($response['code'] ?? -1) === 0;
     }
 
-    public function disablePrivacyProtection(Registrar_Domain $domain)
+    public function disablePrivacyProtection(Registrar_Domain $domain): bool
     {
         $domainId = $this->_getDomainId($domain);
+        $response = $this->_request('PUT', "/domains/{$domainId}", ['is_private_whois_enabled' => false]);
 
-        $data = [
-            'is_private_whois_enabled' => false,
-        ];
+        return ($response['code'] ?? -1) === 0;
+    }
 
-        $response = $this->_request('PUT', "/domains/{$domainId}", $data);
-        if ($response['code'] === 0) {
-            return true;
+    // -------------------------------------------------------------------------
+    // Private helpers
+    // -------------------------------------------------------------------------
+
+    private function _stripTld(Registrar_Domain $domain): string
+    {
+        return trim($domain->getTld(), '.');
+    }
+
+    private function _getDomainId(Registrar_Domain $domain): int
+    {
+        $response = $this->_request('GET', '/domains', ['full_name' => $domain->getName()]);
+
+        if (!empty($response['data']['results'])) {
+            return (int) $response['data']['results'][0]['id'];
         }
 
-        return false;
+        throw new Registrar_Exception('Domain not found in OpenProvider: ' . $domain->getName());
     }
 
-    private function _stripTld(Registrar_Domain $domain)
+    private function _getOrCreateCustomer(Registrar_Domain_Contact $contact, bool $updateExisting = false): string
     {
-        $tld = $domain->getTld();
-        return preg_replace("/^\.+|\.+$/", "", $tld);
-    }
-
-    private function _getDomainId(Registrar_Domain $domain)
-    {
-        $data = [
-            'full_name' => $domain->getName(),
-        ];
-
-        try {
-            $response = $this->_request('GET', '/domains', $data);
-            if (!empty($response['data']['results']) && count($response['data']['results']) > 0) {
-                return $response['data']['results'][0]['id']; // Return the OpenProvider domain ID
-            }
-            throw new Registrar_Exception('Domain not found in OpenProvider: ' . $domain->getName());
-        } catch (Exception $e) {
-            throw new Registrar_Exception('Failed to fetch domain ID: ' . $e->getMessage());
-        }
-    }
-
-    private function _getOrCreateCustomer(Registrar_Domain_Contact $contact, $updateExisting = false)
-    {
-        $data = [
-            'email' => $contact->getEmail(),
-            'phone' => [
-                'country_code' => $contact->getTelCc(),
-                'area_code' => "6",
-                'subscriber_number' => $contact->getTel()
+        $payload = [
+            'email'        => $contact->getEmail(),
+            'phone'        => [
+                'country_code'       => $contact->getTelCc(),
+                'area_code'          => '6',
+                'subscriber_number'  => $contact->getTel(),
             ],
             'company_name' => $contact->getCompany() ?? '',
-            'address' => [
-                'street' => $contact->getAddress1(),
-                'zipcode' => $contact->getZip(),
-                'city' => $contact->getCity(),
-                'state' => $contact->getState(),
-                'country' => $contact->getCountry(),
+            'address'      => [
+                'street'   => $contact->getAddress1(),
+                'zipcode'  => $contact->getZip(),
+                'city'     => $contact->getCity(),
+                'state'    => $contact->getState(),
+                'country'  => $contact->getCountry(),
             ],
-            'name' => [
+            'name'         => [
                 'first_name' => $contact->getFirstName(),
-                'last_name' => $contact->getLastName(),
-            ]
+                'last_name'  => $contact->getLastName(),
+            ],
         ];
 
-        // Step 1: Check if the customer already exists by email
-        $existingCustomerHandle = $this->_findCustomerByEmail($contact->getEmail());
-        if ($existingCustomerHandle) {
+        $handle = $this->_findCustomerByEmail($contact->getEmail());
+
+        if ($handle !== null) {
             if ($updateExisting) {
-                $response = $this->_request('PUT', "/customers/{$existingCustomerHandle}", $data);
-                if ($response['code'] !== 0) {
-                    throw new Registrar_Exception('Failed to update contact: ' . $response['msg']);
+                $response = $this->_request('PUT', "/customers/{$handle}", $payload);
+                if (($response['code'] ?? -1) !== 0) {
+                    throw new Registrar_Exception('Failed to update customer: ' . ($response['desc'] ?? 'unknown error'));
                 }
             }
-
-            return $existingCustomerHandle;
+            return $handle;
         }
 
-        // Step 2: Create a new customer if not found
-        try {
-            $response = $this->_request('POST', '/customers', $data);
-            if (isset($response['data']['handle'])) {
-                return $response['data']['handle'];
-            }
-            throw new Registrar_Exception('Failed to create customer: ' . $response['msg']);
-        } catch (Exception $e) {
-            throw new Registrar_Exception('OpenProvider API Error: ' . $e->getMessage());
+        $response = $this->_request('POST', '/customers', $payload);
+
+        if (isset($response['data']['handle'])) {
+            return $response['data']['handle'];
         }
+
+        throw new Registrar_Exception('Failed to create customer: ' . ($response['desc'] ?? 'unknown error'));
     }
 
-    private function _findCustomerByEmail($email)
+    private function _findCustomerByEmail(string $email): ?string
     {
-        $data = [
-            'email_pattern' => $email, // Search by email pattern
+        $response = $this->_request('GET', '/customers', ['email_pattern' => $email]);
+
+        if (!empty($response['data']['results'])) {
+            return $response['data']['results'][0]['handle'];
+        }
+
+        return null;
+    }
+
+    private function _getCustomer(string $handle): array
+    {
+        $response = $this->_request('GET', "/customers/{$handle}");
+
+        if (($response['code'] ?? -1) === 0 && !empty($response['data'])) {
+            return $response['data'];
+        }
+
+        throw new Registrar_Exception('Failed to fetch customer: ' . $handle);
+    }
+
+    private function _hydrateContact(Registrar_Domain_Contact $contact, array $customer): Registrar_Domain_Contact
+    {
+        $contact->setFirstName($customer['name']['first_name'] ?? '');
+        $contact->setLastName($customer['name']['last_name'] ?? '');
+        $contact->setEmail($customer['email'] ?? '');
+        $contact->setTelCc($customer['phone']['country_code'] ?? '');
+        $contact->setTel($customer['phone']['subscriber_number'] ?? '');
+        $contact->setAddress1($customer['address']['street'] ?? '');
+        $contact->setCity($customer['address']['city'] ?? '');
+        $contact->setState($customer['address']['state'] ?? '');
+        $contact->setCountry($customer['address']['country'] ?? '');
+        $contact->setZip($customer['address']['zipcode'] ?? '');
+        $contact->setCompany($customer['company_name'] ?? '');
+
+        return $contact;
+    }
+
+    private function _getAccessToken(): string
+    {
+        if ($this->accessToken !== null) {
+            return $this->accessToken;
+        }
+
+        $client   = $this->getHttpClient();
+        $response = $client->request('POST', $this->config['ApiUrl'] . '/v1beta/auth/login', [
+            'json' => [
+                'username' => $this->config['Username'],
+                'password' => $this->config['Password'],
+            ],
+        ]);
+
+        $data = $response->toArray(false);
+        $this->accessToken = $data['data']['token'] ?? null;
+
+        if (empty($this->accessToken)) {
+            throw new Registrar_Exception('OpenProvider authentication failed.');
+        }
+
+        return $this->accessToken;
+    }
+
+    private function _request(string $method, string $url, array $data = []): array
+    {
+        $token   = $this->_getAccessToken();
+        $client  = $this->getHttpClient();
+        $fullUrl = $this->config['ApiUrl'] . '/v1beta' . $url;
+
+        $options = [
+            'headers' => [
+                'Authorization' => 'Bearer ' . $token,
+                'Content-Type'  => 'application/json',
+            ],
         ];
 
-        try {
-            $response = $this->_request('GET', '/customers', $data);
-            if (!empty($response['data']['results']) && count($response['data']['results']) > 0) {
-                return $response['data']['results'][0]['handle']; // Return the customer handle
-            }
-            return null; // No matching customer found
-        } catch (Exception $e) {
-            throw new Registrar_Exception('Failed to find customer by email: ' . $e->getMessage());
+        if ($method === 'GET') {
+            $options['query'] = $data;
+        } else {
+            $options['json'] = $data;
         }
-    }
 
+        $response = $client->request($method, $fullUrl, $options);
+        $result   = $response->toArray(false);
 
-    private function _getCustomer($handle)
-    {
-        try {
-            $response = $this->_request('GET', "/customers/{$handle}");
-            if ($response['code'] === 0 && !empty($response['data'])) {
-                return $response['data']; // Return the customer data
-            }
-            return null; // No matching customer found
-        } catch (Exception $e) {
-            throw new Registrar_Exception('Failed to find customer by email: ' . $e->getMessage());
-        }
-    }
+        $this->getLog()->debug('OpenProvider API ' . $method . ' ' . $url, [
+            'request'  => $data,
+            'response' => $result,
+        ]);
 
-    /**
-     * Send OpenProvider request
-     */
-    private function _request($method, $url, $data = []): array
-    {
-        try {
-            $username   = $this->config['Username'];
-            $password   = $this->config['Password'];
-            $apiUrl     = $this->config['ApiUrl'];
-
-            $op     = new OpenProvider_API();
-            $op->setApi_login($username, $password, $apiUrl);
-
-            $response = $op->request($method, $url, $data);
-            $this->_logResponse($method, $url, $data, $response);
-
-            return $response;
-        } catch (Exception $e) {
-            $this->_logError($method, $url, $data, $e->getMessage());
-            throw $e;
-        }
-    }
-
-    private function _logResponse($method, $url, $data, $response)
-    {
-        file_put_contents(__DIR__ . '/' . self::DIR_LOG . '/' . self::FILE_LOG, json_encode([
-            'method' => $method,
-            'url' => $url,
-            'data' => $data,
-            'response' => $response,
-        ], JSON_PRETTY_PRINT), FILE_APPEND);
-    }
-
-    private function _logError($method, $url, $data, $error)
-    {
-        file_put_contents(__DIR__ . '/' . self::DIR_LOG . '/' . self::FILE_LOG, json_encode([
-            'method' => $method,
-            'url' => $url,
-            'data' => $data,
-            'error' => $error,
-        ], JSON_PRETTY_PRINT), FILE_APPEND);
+        return $result;
     }
 }
