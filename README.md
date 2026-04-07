@@ -1,5 +1,7 @@
 # OpenProvider Integration for FOSSBilling
 
+[![Tests](https://img.shields.io/github/actions/workflow/status/Vicedomini-Softworks/fossbilling-registrar-openprovider/tests.yml?branch=main&label=tests)](https://github.com/Vicedomini-Softworks/fossbilling-registrar-openprovider/actions/workflows/tests.yml)
+
 This project integrates the OpenProvider domain registrar with FOSSBilling, enabling users to manage domain registration, transfer, and renewal directly from their FOSSBilling platform.
 
 ---
