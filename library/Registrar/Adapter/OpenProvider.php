@@ -1,7 +1,7 @@
 <?php
 
 /**
- * @copyright Vicedomini Softworks (https://www.vicedomini.com)
+ * @copyright Vicedomini Softworks (https://www.vicedominisoftworks.com)
  * @license   Apache-2.0
  *
  * This source file is subject to the Apache 2.0 License that is bundled
