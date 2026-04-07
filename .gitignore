@@ -1,1 +1,17 @@
-.DS_Store
+# Composer
+/vendor/
+composer.lock
+
+# PHPUnit
+/.phpunit.cache/
+/coverage/
+
+# Logs generati dall'adapter
+/library/Registrar/Adapter/OpenProvider/logs/
+
+# IDE / OS
+.idea/
+.vscode/
+*.DS_Store
+Thumbs.db
+*.cache
