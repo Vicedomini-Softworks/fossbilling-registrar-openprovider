@@ -1,73 +1,83 @@
 <?php
 
+/**
+ * Stub that mirrors the real FOSSBilling Registrar_Domain class.
+ * Nameservers are plain strings; dates are Unix timestamps.
+ */
 class Registrar_Domain
 {
-    private ?string $sld                = null;
-    private ?string $tld                = null;
-    private ?int    $period             = null;
-    private ?string $epp                = null;
-    private bool    $privacyEnabled     = false;
-    private bool    $locked             = false;
-    private ?\DateTime $registeredAt    = null;
-    private ?\DateTime $expiresAt       = null;
+    private $_tld;
+    private $_sld;
+    private $_registered_at;
+    private $_expires_at;
+    private ?int $_period   = null;
+    private $_epp;
+    private ?bool $_privacy = null;
+    private $_locked;
+    private $_ns1;
+    private $_ns2;
+    private $_ns3;
+    private $_ns4;
 
-    private ?Registrar_Domain_Nameserver $ns1 = null;
-    private ?Registrar_Domain_Nameserver $ns2 = null;
-    private ?Registrar_Domain_Nameserver $ns3 = null;
-    private ?Registrar_Domain_Nameserver $ns4 = null;
+    private ?Registrar_Domain_Contact $_contact_registrar = null;
+    private ?Registrar_Domain_Contact $_contact_admin     = null;
+    private ?Registrar_Domain_Contact $_contact_tech      = null;
+    private ?Registrar_Domain_Contact $_contact_billing   = null;
 
-    private ?Registrar_Domain_Contact $contactRegistrar = null;
-    private ?Registrar_Domain_Contact $contactAdmin     = null;
-    private ?Registrar_Domain_Contact $contactTech      = null;
-    private ?Registrar_Domain_Contact $contactBilling   = null;
+    public function getSld()             { return $this->_sld; }
+    public function setSld($v): self     { $this->_sld = $v; return $this; }
 
-    public function getSld(): ?string  { return $this->sld; }
-    public function setSld(string $v): self { $this->sld = $v; return $this; }
+    public function getTld($with_dot = true)
+    {
+        if ($with_dot === false && isset($this->_tld[0]) && $this->_tld[0] === '.') {
+            return ltrim((string) $this->_tld, '.');
+        }
+        return $this->_tld;
+    }
+    public function setTld($v): self { $this->_tld = $v; return $this; }
 
-    public function getTld(): ?string  { return $this->tld; }
-    public function setTld(string $v): self { $this->tld = $v; return $this; }
+    public function getName(): string { return $this->_sld . $this->_tld; }
 
-    public function getName(): string  { return $this->sld . $this->tld; }
+    public function getRegistrationPeriod(): ?int  { return $this->_period; }
+    public function setRegistrationPeriod($v): self { $this->_period = (int) $v; return $this; }
 
-    public function getRegistrationPeriod(): ?int  { return $this->period; }
-    public function setRegistrationPeriod(int $v): self { $this->period = $v; return $this; }
+    public function getEpp()         { return $this->_epp; }
+    public function setEpp($v): self { $this->_epp = $v; return $this; }
 
-    public function getEpp(): ?string  { return $this->epp; }
-    public function setEpp(string $v): self  { $this->epp = $v; return $this; }
+    public function getPrivacyEnabled(): ?bool      { return $this->_privacy; }
+    public function setPrivacyEnabled($v): self     { $this->_privacy = (bool) $v; return $this; }
 
-    public function isPrivacyEnabled(): bool  { return $this->privacyEnabled; }
-    public function setPrivacyEnabled(bool $v): self { $this->privacyEnabled = $v; return $this; }
+    public function getLocked()          { return $this->_locked; }
+    public function setLocked($v): self  { $this->_locked = $v; return $this; }
 
-    public function isLocked(): bool  { return $this->locked; }
-    public function setLocked(bool $v): self { $this->locked = $v; return $this; }
+    public function getRegistrationTime() { return $this->_registered_at; }
+    public function setRegistrationTime($v): self { $this->_registered_at = $v; return $this; }
 
-    public function getRegisteredAt(): ?\DateTime  { return $this->registeredAt; }
-    public function setRegisteredAt(\DateTime $v): self { $this->registeredAt = $v; return $this; }
+    public function getExpirationTime() { return $this->_expires_at; }
+    public function setExpirationTime($v): self { $this->_expires_at = $v; return $this; }
 
-    public function getExpiresAt(): ?\DateTime  { return $this->expiresAt; }
-    public function setExpiresAt(\DateTime $v): self { $this->expiresAt = $v; return $this; }
+    // Nameservers: plain strings, exactly as FOSSBilling stores them
+    public function getNs1()         { return $this->_ns1; }
+    public function setNs1($v): self { $this->_ns1 = $v; return $this; }
 
-    public function getNs1(): ?Registrar_Domain_Nameserver { return $this->ns1; }
-    public function setNs1(Registrar_Domain_Nameserver $v): self { $this->ns1 = $v; return $this; }
+    public function getNs2()         { return $this->_ns2; }
+    public function setNs2($v): self { $this->_ns2 = $v; return $this; }
 
-    public function getNs2(): ?Registrar_Domain_Nameserver { return $this->ns2; }
-    public function setNs2(Registrar_Domain_Nameserver $v): self { $this->ns2 = $v; return $this; }
+    public function getNs3()         { return $this->_ns3; }
+    public function setNs3($v): self { $this->_ns3 = $v; return $this; }
 
-    public function getNs3(): ?Registrar_Domain_Nameserver { return $this->ns3; }
-    public function setNs3(Registrar_Domain_Nameserver $v): self { $this->ns3 = $v; return $this; }
+    public function getNs4()         { return $this->_ns4; }
+    public function setNs4($v): self { $this->_ns4 = $v; return $this; }
 
-    public function getNs4(): ?Registrar_Domain_Nameserver { return $this->ns4; }
-    public function setNs4(Registrar_Domain_Nameserver $v): self { $this->ns4 = $v; return $this; }
+    public function getContactRegistrar(): ?Registrar_Domain_Contact { return $this->_contact_registrar; }
+    public function setContactRegistrar(Registrar_Domain_Contact $c): self { $this->_contact_registrar = $c; return $this; }
 
-    public function getContactRegistrar(): ?Registrar_Domain_Contact { return $this->contactRegistrar; }
-    public function setContactRegistrar(Registrar_Domain_Contact $v): self { $this->contactRegistrar = $v; return $this; }
+    public function getContactAdmin(): ?Registrar_Domain_Contact { return $this->_contact_admin; }
+    public function setContactAdmin(Registrar_Domain_Contact $c): self { $this->_contact_admin = $c; return $this; }
 
-    public function getContactAdmin(): ?Registrar_Domain_Contact { return $this->contactAdmin; }
-    public function setContactAdmin(Registrar_Domain_Contact $v): self { $this->contactAdmin = $v; return $this; }
+    public function getContactTech(): ?Registrar_Domain_Contact { return $this->_contact_tech; }
+    public function setContactTech(Registrar_Domain_Contact $c): self { $this->_contact_tech = $c; return $this; }
 
-    public function getContactTech(): ?Registrar_Domain_Contact { return $this->contactTech; }
-    public function setContactTech(Registrar_Domain_Contact $v): self { $this->contactTech = $v; return $this; }
-
-    public function getContactBilling(): ?Registrar_Domain_Contact { return $this->contactBilling; }
-    public function setContactBilling(Registrar_Domain_Contact $v): self { $this->contactBilling = $v; return $this; }
+    public function getContactBilling(): ?Registrar_Domain_Contact { return $this->_contact_billing; }
+    public function setContactBilling(Registrar_Domain_Contact $c): self { $this->_contact_billing = $c; return $this; }
 }

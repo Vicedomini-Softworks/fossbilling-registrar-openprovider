@@ -4,27 +4,31 @@ use Symfony\Contracts\HttpClient\HttpClientInterface;
 
 abstract class Registrar_AdapterAbstract
 {
-    private ?Box_Log $log                    = null;
-    private ?HttpClientInterface $httpClient = null;
+    protected $_log;
+    protected bool $_testMode = false;
+
+    public function setLog(Box_Log $log)
+    {
+        $this->_log = $log;
+        return $this;
+    }
 
     public function getLog(): Box_Log
     {
-        if ($this->log === null) {
-            $this->log = new Box_Log();
+        if (!$this->_log instanceof Box_Log) {
+            $this->_log = new Box_Log();
         }
-        return $this->log;
-    }
-
-    public function setLog(Box_Log $log): static
-    {
-        $this->log = $log;
-        return $this;
+        return $this->_log;
     }
 
     public function getHttpClient(): HttpClientInterface
     {
-        throw new \RuntimeException('getHttpClient() must be provided — mock it in tests.');
+        throw new \RuntimeException('getHttpClient() must be mocked in tests.');
     }
 
-    public function enableTestMode(): void {}
+    public function enableTestMode()
+    {
+        $this->_testMode = true;
+        return $this;
+    }
 }

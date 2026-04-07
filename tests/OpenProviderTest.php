@@ -46,8 +46,7 @@ class OpenProviderTest extends TestCase
     }
 
     /**
-     * Queue consecutive HTTP responses in order. The first call is always the
-     * bearer-token auth request; callers pass the subsequent API responses.
+     * Queue consecutive HTTP responses. The first is always the auth request.
      */
     private function queueResponses(array ...$apiResponses): void
     {
@@ -182,8 +181,7 @@ class OpenProviderTest extends TestCase
 
     public function testTokenIsCachedAcrossRequests(): void
     {
-        // Two calls to isDomainAvailable on the same adapter instance
-        // should only trigger one auth request (token cached after first call).
+        // Two calls on the same adapter instance should trigger only one auth request.
         $this->httpClient
             ->expects($this->exactly(3))  // 1 auth + 2 domain checks
             ->method('request')
@@ -263,8 +261,8 @@ class OpenProviderTest extends TestCase
     {
         $this->queueResponses(
             $this->auth(),
-            $this->customerResult(),   // find by email
-            $this->ok()                // POST /domains
+            $this->customerResult(),
+            $this->ok()
         );
 
         $this->assertTrue($this->adapter->registerDomain($this->makeDomain()));
@@ -274,9 +272,9 @@ class OpenProviderTest extends TestCase
     {
         $this->queueResponses(
             $this->auth(),
-            ['data' => ['results' => []]],                  // customer not found
-            ['code' => 0, 'data' => ['handle' => 'NEW-1']], // POST /customers
-            $this->ok()                                     // POST /domains
+            ['data' => ['results' => []]],
+            ['code' => 0, 'data' => ['handle' => 'NEW-1']],
+            $this->ok()
         );
 
         $this->assertTrue($this->adapter->registerDomain($this->makeDomain()));
@@ -297,8 +295,8 @@ class OpenProviderTest extends TestCase
     {
         $this->queueResponses(
             $this->auth(),
-            ['data' => ['results' => []]],  // customer not found
-            ['code' => 1, 'desc' => 'Invalid data']  // POST /customers fails (no 'handle')
+            ['data' => ['results' => []]],
+            ['code' => 1, 'desc' => 'Invalid data']
         );
 
         $this->expectException(\Registrar_Exception::class);
@@ -395,7 +393,7 @@ class OpenProviderTest extends TestCase
                         ['name' => 'ns2.openprovider.nl'],
                         ['name' => 'ns3.openprovider.nl'],
                     ],
-                    'admin_handle'             => 'OP-ADM-42',
+                    'admin_handle' => 'OP-ADM-42',
                 ],
             ],
             [
@@ -419,14 +417,18 @@ class OpenProviderTest extends TestCase
         $domain = $this->adapter->getDomainDetails($this->makeDomain());
 
         $this->assertInstanceOf(\Registrar_Domain::class, $domain);
-        $this->assertTrue($domain->isPrivacyEnabled());
-        $this->assertFalse($domain->isLocked());
+        $this->assertTrue($domain->getPrivacyEnabled());
+        $this->assertFalse($domain->getLocked());
 
-        $this->assertInstanceOf(\Registrar_Domain_Nameserver::class, $domain->getNs1());
-        $this->assertSame('ns1.openprovider.nl', $domain->getNs1()->getHost());
-        $this->assertSame('ns2.openprovider.nl', $domain->getNs2()->getHost());
-        $this->assertSame('ns3.openprovider.nl', $domain->getNs3()->getHost());
+        // Nameservers are plain strings
+        $this->assertSame('ns1.openprovider.nl', $domain->getNs1());
+        $this->assertSame('ns2.openprovider.nl', $domain->getNs2());
+        $this->assertSame('ns3.openprovider.nl', $domain->getNs3());
         $this->assertNull($domain->getNs4());
+
+        // Dates are Unix timestamps
+        $this->assertSame('2020-03-15', date('Y-m-d', $domain->getRegistrationTime()));
+        $this->assertSame('2026-03-15', date('Y-m-d', $domain->getExpirationTime()));
 
         $admin = $domain->getContactAdmin();
         $this->assertSame('Jane', $admin->getFirstName());
@@ -435,9 +437,6 @@ class OpenProviderTest extends TestCase
         $this->assertSame('Amsterdam', $admin->getCity());
         $this->assertSame('NL', $admin->getCountry());
         $this->assertSame('OpenProvider BV', $admin->getCompany());
-
-        $this->assertSame('2020-03-15', $domain->getRegisteredAt()->format('Y-m-d'));
-        $this->assertSame('2026-03-15', $domain->getExpiresAt()->format('Y-m-d'));
     }
 
     public function testGetDomainDetailsWithNoNameservers(): void
@@ -468,7 +467,8 @@ class OpenProviderTest extends TestCase
         );
 
         $domain = $this->adapter->getDomainDetails($this->makeDomain());
-        $this->assertTrue($domain->isLocked());
+        $this->assertTrue($domain->getLocked());
+        $this->assertFalse($domain->getPrivacyEnabled());
         $this->assertNull($domain->getNs1());
         $this->assertNull($domain->getNs2());
     }
@@ -503,24 +503,24 @@ class OpenProviderTest extends TestCase
     // modifyNs
     // -------------------------------------------------------------------------
 
-    public function testModifyNsReturnsTrueOnSuccess(): void
+    public function testModifyNsSendsNameserversAsStrings(): void
     {
         $this->queueResponses($this->auth(), $this->domainIdResult(), $this->ok());
 
         $domain = $this->makeDomain();
-        $domain->setNs1((new \Registrar_Domain_Nameserver())->setHost('ns1.example.com'));
-        $domain->setNs2((new \Registrar_Domain_Nameserver())->setHost('ns2.example.com'));
+        $domain->setNs1('ns1.example.com');
+        $domain->setNs2('ns2.example.com');
 
         $this->assertTrue($this->adapter->modifyNs($domain));
     }
 
     public function testModifyNsSkipsNullNameservers(): void
     {
-        // Domain with only ns1 set — should still succeed
         $this->queueResponses($this->auth(), $this->domainIdResult(), $this->ok());
 
         $domain = $this->makeDomain();
-        $domain->setNs1((new \Registrar_Domain_Nameserver())->setHost('ns1.example.com'));
+        $domain->setNs1('ns1.example.com');
+        // ns2, ns3, ns4 intentionally left null
 
         $this->assertTrue($this->adapter->modifyNs($domain));
     }
@@ -539,10 +539,10 @@ class OpenProviderTest extends TestCase
     {
         $this->queueResponses(
             $this->auth(),
-            $this->domainIdResult(),            // _getDomainId
-            $this->customerResult(),            // _findCustomerByEmail
-            $this->ok(),                        // PUT /customers (updateExisting=true)
-            $this->ok()                         // PUT /domains/{id}
+            $this->domainIdResult(),
+            $this->customerResult(),    // find by email
+            $this->ok(),               // PUT /customers (updateExisting=true)
+            $this->ok()                // PUT /domains/{id}
         );
 
         $this->assertTrue($this->adapter->modifyContact($this->makeDomain()));
@@ -554,8 +554,8 @@ class OpenProviderTest extends TestCase
             $this->auth(),
             $this->domainIdResult(),
             $this->customerResult(),
-            $this->ok(),       // customer update ok
-            $this->apiError()      // domain update fails
+            $this->ok(),
+            $this->apiError()
         );
 
         $this->assertFalse($this->adapter->modifyContact($this->makeDomain()));
@@ -624,20 +624,19 @@ class OpenProviderTest extends TestCase
     public function testTldWithLeadingDotIsStrippedBeforeSendingToApi(): void
     {
         $capturedOptions = null;
+        $call = 0;
 
         $this->httpClient
             ->method('request')
-            ->willReturnCallback(function (string $method, string $url, array $options) use (&$capturedOptions) {
-                static $call = 0;
-                if ($call === 0) {
-                    $call++;
-                    $r = $this->createMock(ResponseInterface::class);
-                    $r->method('toArray')->willReturn($this->auth());
-                    return $r;
-                }
-                $capturedOptions = $options;
+            ->willReturnCallback(function (string $method, string $url, array $options) use (&$capturedOptions, &$call) {
                 $r = $this->createMock(ResponseInterface::class);
-                $r->method('toArray')->willReturn(['data' => ['results' => [['status' => 'free']]]]);
+                if ($call === 0) {
+                    $r->method('toArray')->willReturn($this->auth());
+                } else {
+                    $capturedOptions = $options;
+                    $r->method('toArray')->willReturn(['data' => ['results' => [['status' => 'free']]]]);
+                }
+                $call++;
                 return $r;
             });
 
@@ -649,20 +648,19 @@ class OpenProviderTest extends TestCase
     public function testTldWithoutDotIsPassedThroughUnchanged(): void
     {
         $capturedOptions = null;
+        $call = 0;
 
         $this->httpClient
             ->method('request')
-            ->willReturnCallback(function (string $method, string $url, array $options) use (&$capturedOptions) {
-                static $call = 0;
-                if ($call === 0) {
-                    $call++;
-                    $r = $this->createMock(ResponseInterface::class);
-                    $r->method('toArray')->willReturn($this->auth());
-                    return $r;
-                }
-                $capturedOptions = $options;
+            ->willReturnCallback(function (string $method, string $url, array $options) use (&$capturedOptions, &$call) {
                 $r = $this->createMock(ResponseInterface::class);
-                $r->method('toArray')->willReturn(['data' => ['results' => [['status' => 'free']]]]);
+                if ($call === 0) {
+                    $r->method('toArray')->willReturn($this->auth());
+                } else {
+                    $capturedOptions = $options;
+                    $r->method('toArray')->willReturn(['data' => ['results' => [['status' => 'free']]]]);
+                }
+                $call++;
                 return $r;
             });
 

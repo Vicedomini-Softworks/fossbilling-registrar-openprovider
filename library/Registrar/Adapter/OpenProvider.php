@@ -10,7 +10,7 @@
 
 class Registrar_Adapter_OpenProvider extends Registrar_AdapterAbstract
 {
-    private array $config = [
+    public array $config = [
         'Username' => null,
         'Password' => null,
         'ApiUrl'   => null,
@@ -23,23 +23,23 @@ class Registrar_Adapter_OpenProvider extends Registrar_AdapterAbstract
         if (!empty($options['Username'])) {
             $this->config['Username'] = $options['Username'];
         } else {
-            throw new Registrar_Exception('OpenProvider error: missing "Username" in configuration.', [], 3001);
+            throw new Registrar_Exception('The ":domain_registrar" domain registrar is not fully configured. Please configure the :missing', [':domain_registrar' => 'OpenProvider', ':missing' => 'Username'], 3001);
         }
 
         if (!empty($options['Password'])) {
             $this->config['Password'] = $options['Password'];
         } else {
-            throw new Registrar_Exception('OpenProvider error: missing "Password" in configuration.', [], 3001);
+            throw new Registrar_Exception('The ":domain_registrar" domain registrar is not fully configured. Please configure the :missing', [':domain_registrar' => 'OpenProvider', ':missing' => 'Password'], 3001);
         }
 
         if (!empty($options['ApiUrl'])) {
             $this->config['ApiUrl'] = rtrim($options['ApiUrl'], '/');
         } else {
-            throw new Registrar_Exception('OpenProvider error: missing "ApiUrl" in configuration.', [], 3001);
+            throw new Registrar_Exception('The ":domain_registrar" domain registrar is not fully configured. Please configure the :missing', [':domain_registrar' => 'OpenProvider', ':missing' => 'API URL'], 3001);
         }
     }
 
-    public static function getConfig(): array
+    public static function getConfig()
     {
         return [
             'label' => 'OpenProvider',
@@ -70,7 +70,7 @@ class Registrar_Adapter_OpenProvider extends Registrar_AdapterAbstract
         ];
     }
 
-    public function isDomainAvailable(Registrar_Domain $domain): bool
+    public function isDomainAvailable(Registrar_Domain $domain)
     {
         $response = $this->_request('POST', '/domains/check', [
             'domains' => [
@@ -84,7 +84,7 @@ class Registrar_Adapter_OpenProvider extends Registrar_AdapterAbstract
         return ($response['data']['results'][0]['status'] ?? '') === 'free';
     }
 
-    public function isDomaincanBeTransferred(Registrar_Domain $domain): bool
+    public function isDomaincanBeTransferred(Registrar_Domain $domain)
     {
         $response = $this->_request('POST', '/domains/check', [
             'domains' => [
@@ -98,7 +98,7 @@ class Registrar_Adapter_OpenProvider extends Registrar_AdapterAbstract
         return ($response['data']['results'][0]['status'] ?? '') === 'active';
     }
 
-    public function registerDomain(Registrar_Domain $domain): bool
+    public function registerDomain(Registrar_Domain $domain)
     {
         $customerHandle = $this->_getOrCreateCustomer($domain->getContactAdmin());
 
@@ -107,19 +107,19 @@ class Registrar_Adapter_OpenProvider extends Registrar_AdapterAbstract
                 'name'      => $domain->getSld(),
                 'extension' => $this->_stripTld($domain),
             ],
-            'period'          => $domain->getRegistrationPeriod(),
-            'owner_handle'    => $customerHandle,
-            'admin_handle'    => $customerHandle,
-            'tech_handle'     => $customerHandle,
-            'billing_handle'  => $customerHandle,
-            'ns_group'        => 'dns-openprovider',
-            'autorenew'       => 'default',
+            'period'         => $domain->getRegistrationPeriod(),
+            'owner_handle'   => $customerHandle,
+            'admin_handle'   => $customerHandle,
+            'tech_handle'    => $customerHandle,
+            'billing_handle' => $customerHandle,
+            'ns_group'       => 'dns-openprovider',
+            'autorenew'      => 'default',
         ]);
 
         return ($response['code'] ?? -1) === 0;
     }
 
-    public function renewDomain(Registrar_Domain $domain): bool
+    public function renewDomain(Registrar_Domain $domain)
     {
         $domainId = $this->_getDomainId($domain);
 
@@ -134,7 +134,7 @@ class Registrar_Adapter_OpenProvider extends Registrar_AdapterAbstract
         return ($response['code'] ?? -1) === 0;
     }
 
-    public function transferDomain(Registrar_Domain $domain): bool
+    public function transferDomain(Registrar_Domain $domain)
     {
         $customerHandle = $this->_getOrCreateCustomer($domain->getContactAdmin());
 
@@ -143,20 +143,20 @@ class Registrar_Adapter_OpenProvider extends Registrar_AdapterAbstract
                 'name'      => $domain->getSld(),
                 'extension' => $this->_stripTld($domain),
             ],
-            'period'          => $domain->getRegistrationPeriod(),
-            'owner_handle'    => $customerHandle,
-            'admin_handle'    => $customerHandle,
-            'tech_handle'     => $customerHandle,
-            'billing_handle'  => $customerHandle,
-            'ns_group'        => 'dns-openprovider',
-            'autorenew'       => 'default',
-            'auth_code'       => $domain->getEpp(),
+            'period'         => $domain->getRegistrationPeriod(),
+            'owner_handle'   => $customerHandle,
+            'admin_handle'   => $customerHandle,
+            'tech_handle'    => $customerHandle,
+            'billing_handle' => $customerHandle,
+            'ns_group'       => 'dns-openprovider',
+            'autorenew'      => 'default',
+            'auth_code'      => $domain->getEpp(),
         ]);
 
         return ($response['code'] ?? -1) === 0;
     }
 
-    public function deleteDomain(Registrar_Domain $domain): bool
+    public function deleteDomain(Registrar_Domain $domain)
     {
         $domainId = $this->_getDomainId($domain);
 
@@ -169,14 +169,14 @@ class Registrar_Adapter_OpenProvider extends Registrar_AdapterAbstract
         return ($response['code'] ?? -1) === 0;
     }
 
-    public function getDomainDetails(Registrar_Domain $domain): Registrar_Domain
+    public function getDomainDetails(Registrar_Domain $domain)
     {
         $domainId = $this->_getDomainId($domain);
         $response = $this->_request('GET', "/domains/{$domainId}");
         $opDomain = $response['data'];
 
-        $domain->setRegisteredAt(new \DateTime($opDomain['creation_date']));
-        $domain->setExpiresAt(new \DateTime($opDomain['expiration_date']));
+        $domain->setRegistrationTime(strtotime($opDomain['creation_date']));
+        $domain->setExpirationTime(strtotime($opDomain['expiration_date']));
         $domain->setPrivacyEnabled((bool) $opDomain['is_private_whois_enabled']);
         $domain->setLocked((bool) $opDomain['is_locked']);
 
@@ -184,9 +184,7 @@ class Registrar_Adapter_OpenProvider extends Registrar_AdapterAbstract
         $nsSetters = ['setNs1', 'setNs2', 'setNs3', 'setNs4'];
         foreach ($nsSetters as $i => $setter) {
             if (!empty($nameservers[$i]['name'])) {
-                $ns = new Registrar_Domain_Nameserver();
-                $ns->setHost($nameservers[$i]['name']);
-                $domain->{$setter}($ns);
+                $domain->{$setter}($nameservers[$i]['name']);
             }
         }
 
@@ -201,7 +199,7 @@ class Registrar_Adapter_OpenProvider extends Registrar_AdapterAbstract
         return $domain;
     }
 
-    public function getEpp(Registrar_Domain $domain): string
+    public function getEpp(Registrar_Domain $domain)
     {
         $domainId = $this->_getDomainId($domain);
         $response = $this->_request('GET', "/domains/{$domainId}/authcode");
@@ -209,14 +207,14 @@ class Registrar_Adapter_OpenProvider extends Registrar_AdapterAbstract
         return $response['data']['auth_code'] ?? '';
     }
 
-    public function modifyNs(Registrar_Domain $domain): bool
+    public function modifyNs(Registrar_Domain $domain)
     {
         $domainId = $this->_getDomainId($domain);
 
         $ns = [];
-        foreach ([$domain->getNs1(), $domain->getNs2(), $domain->getNs3(), $domain->getNs4()] as $nameserver) {
-            if ($nameserver instanceof Registrar_Domain_Nameserver && $nameserver->getHost()) {
-                $ns[] = ['name' => $nameserver->getHost()];
+        foreach ([$domain->getNs1(), $domain->getNs2(), $domain->getNs3(), $domain->getNs4()] as $host) {
+            if (!empty($host)) {
+                $ns[] = ['name' => $host];
             }
         }
 
@@ -225,7 +223,7 @@ class Registrar_Adapter_OpenProvider extends Registrar_AdapterAbstract
         return ($response['code'] ?? -1) === 0;
     }
 
-    public function modifyContact(Registrar_Domain $domain): bool
+    public function modifyContact(Registrar_Domain $domain)
     {
         $domainId       = $this->_getDomainId($domain);
         $customerHandle = $this->_getOrCreateCustomer($domain->getContactAdmin(), true);
@@ -240,7 +238,7 @@ class Registrar_Adapter_OpenProvider extends Registrar_AdapterAbstract
         return ($response['code'] ?? -1) === 0;
     }
 
-    public function lock(Registrar_Domain $domain): bool
+    public function lock(Registrar_Domain $domain)
     {
         $domainId = $this->_getDomainId($domain);
         $response = $this->_request('PUT', "/domains/{$domainId}", ['is_locked' => true]);
@@ -248,7 +246,7 @@ class Registrar_Adapter_OpenProvider extends Registrar_AdapterAbstract
         return ($response['code'] ?? -1) === 0;
     }
 
-    public function unlock(Registrar_Domain $domain): bool
+    public function unlock(Registrar_Domain $domain)
     {
         $domainId = $this->_getDomainId($domain);
         $response = $this->_request('PUT', "/domains/{$domainId}", ['is_locked' => false]);
@@ -256,7 +254,7 @@ class Registrar_Adapter_OpenProvider extends Registrar_AdapterAbstract
         return ($response['code'] ?? -1) === 0;
     }
 
-    public function enablePrivacyProtection(Registrar_Domain $domain): bool
+    public function enablePrivacyProtection(Registrar_Domain $domain)
     {
         $domainId = $this->_getDomainId($domain);
         $response = $this->_request('PUT', "/domains/{$domainId}", ['is_private_whois_enabled' => true]);
@@ -264,7 +262,7 @@ class Registrar_Adapter_OpenProvider extends Registrar_AdapterAbstract
         return ($response['code'] ?? -1) === 0;
     }
 
-    public function disablePrivacyProtection(Registrar_Domain $domain): bool
+    public function disablePrivacyProtection(Registrar_Domain $domain)
     {
         $domainId = $this->_getDomainId($domain);
         $response = $this->_request('PUT', "/domains/{$domainId}", ['is_private_whois_enabled' => false]);
@@ -278,7 +276,7 @@ class Registrar_Adapter_OpenProvider extends Registrar_AdapterAbstract
 
     private function _stripTld(Registrar_Domain $domain): string
     {
-        return trim($domain->getTld(), '.');
+        return $domain->getTld(false);
     }
 
     private function _getDomainId(Registrar_Domain $domain): int
@@ -297,17 +295,17 @@ class Registrar_Adapter_OpenProvider extends Registrar_AdapterAbstract
         $payload = [
             'email'        => $contact->getEmail(),
             'phone'        => [
-                'country_code'       => $contact->getTelCc(),
-                'area_code'          => '6',
-                'subscriber_number'  => $contact->getTel(),
+                'country_code'      => $contact->getTelCc(),
+                'area_code'         => '6',
+                'subscriber_number' => $contact->getTel(),
             ],
             'company_name' => $contact->getCompany() ?? '',
             'address'      => [
-                'street'   => $contact->getAddress1(),
-                'zipcode'  => $contact->getZip(),
-                'city'     => $contact->getCity(),
-                'state'    => $contact->getState(),
-                'country'  => $contact->getCountry(),
+                'street'  => $contact->getAddress1(),
+                'zipcode' => $contact->getZip(),
+                'city'    => $contact->getCity(),
+                'state'   => $contact->getState(),
+                'country' => $contact->getCountry(),
             ],
             'name'         => [
                 'first_name' => $contact->getFirstName(),
@@ -324,6 +322,7 @@ class Registrar_Adapter_OpenProvider extends Registrar_AdapterAbstract
                     throw new Registrar_Exception('Failed to update customer: ' . ($response['desc'] ?? 'unknown error'));
                 }
             }
+
             return $handle;
         }
 
@@ -389,7 +388,7 @@ class Registrar_Adapter_OpenProvider extends Registrar_AdapterAbstract
             ],
         ]);
 
-        $data = $response->toArray(false);
+        $data              = $response->toArray(false);
         $this->accessToken = $data['data']['token'] ?? null;
 
         if (empty($this->accessToken)) {
@@ -421,10 +420,7 @@ class Registrar_Adapter_OpenProvider extends Registrar_AdapterAbstract
         $response = $client->request($method, $fullUrl, $options);
         $result   = $response->toArray(false);
 
-        $this->getLog()->debug('OpenProvider API ' . $method . ' ' . $url, [
-            'request'  => $data,
-            'response' => $result,
-        ]);
+        $this->getLog()->info('OpenProvider API ' . $method . ' ' . $url . ' - response code: ' . ($result['code'] ?? 'n/a'));
 
         return $result;
     }
