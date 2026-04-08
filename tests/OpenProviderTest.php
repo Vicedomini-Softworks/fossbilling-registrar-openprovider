@@ -473,6 +473,64 @@ class OpenProviderTest extends TestCase
         $this->assertNull($domain->getNs2());
     }
 
+    public function testGetDomainDetailsUsesOwnerHandleWhenAdminHandleIsNull(): void
+    {
+        $this->queueResponses(
+            $this->auth(),
+            $this->domainIdResult(),
+            [
+                'code' => 0,
+                'data' => [
+                    'creation_date'            => '2021-06-01 00:00:00',
+                    'expiration_date'          => '2027-06-01 00:00:00',
+                    'is_private_whois_enabled' => false,
+                    'is_locked'                => false,
+                    'name_servers'             => [],
+                    'admin_handle'             => null,
+                    'owner_handle'             => 'OP-OWN-99',
+                ],
+            ],
+            [
+                'code' => 0,
+                'data' => [
+                    'name'    => ['first_name' => 'Mario', 'last_name' => 'Rossi'],
+                    'email'   => 'mario@rossi.it',
+                    'phone'   => ['country_code' => '+39', 'subscriber_number' => '3331234567'],
+                    'address' => ['street' => 'Via Roma 1', 'city' => 'Milano', 'state' => 'MI', 'country' => 'IT', 'zipcode' => '20100'],
+                ],
+            ]
+        );
+
+        $domain = $this->adapter->getDomainDetails($this->makeDomain());
+        $this->assertSame('Mario', $domain->getContactAdmin()->getFirstName());
+        $this->assertSame('IT', $domain->getContactAdmin()->getCountry());
+    }
+
+    public function testGetDomainDetailsSkipsContactsWhenBothHandlesAreNull(): void
+    {
+        $this->queueResponses(
+            $this->auth(),
+            $this->domainIdResult(),
+            [
+                'code' => 0,
+                'data' => [
+                    'creation_date'            => '2021-06-01 00:00:00',
+                    'expiration_date'          => '2027-06-01 00:00:00',
+                    'is_private_whois_enabled' => false,
+                    'is_locked'                => false,
+                    'name_servers'             => [],
+                    'admin_handle'             => null,
+                    'owner_handle'             => null,
+                ],
+            ]
+        );
+
+        // should not throw and must return the domain with dates populated
+        $domain = $this->adapter->getDomainDetails($this->makeDomain());
+        $this->assertInstanceOf(\Registrar_Domain::class, $domain);
+        $this->assertSame('2021-06-01', date('Y-m-d', $domain->getRegistrationTime()));
+    }
+
     // -------------------------------------------------------------------------
     // getEpp
     // -------------------------------------------------------------------------

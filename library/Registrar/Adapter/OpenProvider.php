@@ -188,13 +188,16 @@ class Registrar_Adapter_OpenProvider extends Registrar_AdapterAbstract
             }
         }
 
-        $customer = $this->_getCustomer($opDomain['admin_handle']);
-        $contact  = $this->_hydrateContact(new Registrar_Domain_Contact(), $customer);
+        $adminHandle = $opDomain['admin_handle'] ?? $opDomain['owner_handle'] ?? null;
+        if (!empty($adminHandle)) {
+            $customer = $this->_getCustomer($adminHandle);
+            $contact  = $this->_hydrateContact(new Registrar_Domain_Contact(), $customer);
 
-        $domain->setContactRegistrar($contact);
-        $domain->setContactAdmin($contact);
-        $domain->setContactTech($contact);
-        $domain->setContactBilling($contact);
+            $domain->setContactRegistrar($contact);
+            $domain->setContactAdmin($contact);
+            $domain->setContactTech($contact);
+            $domain->setContactBilling($contact);
+        }
 
         return $domain;
     }
