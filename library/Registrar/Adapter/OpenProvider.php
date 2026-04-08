@@ -414,7 +414,7 @@ class Registrar_Adapter_OpenProvider extends Registrar_AdapterAbstract
             ],
         ];
 
-        if ($method === 'GET') {
+        if ($method === 'GET' || $method === 'DELETE') {
             $options['query'] = $data;
         } else {
             $options['json'] = $data;

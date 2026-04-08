@@ -1,6 +1,13 @@
 # Changelog
 
-## [Unreleased] - 2026-04-08
+## [Unreleased] - 2026-04-09
+
+### Fixed
+
+- **`getDomainDetails`: gestione `admin_handle` null**: fallback su `owner_handle` se `admin_handle` è assente; skip idratazione contatti se entrambi i campi sono null, evitando `TypeError` su domini senza handle amministrativo.
+- **`deleteDomain`: parametri DELETE ora come query string**: secondo la spec OpenProvider v1beta, `skip_soft_quarantine`, `force_delete` e `type` sono query parameters, non campi del body JSON.
+
+## 2026-04-08
 
 ### Added
 
