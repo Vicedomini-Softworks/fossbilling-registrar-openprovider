@@ -1,6 +1,12 @@
 # Changelog
 
-## [Unreleased] - 2026-04-07
+## [Unreleased] - 2026-04-08
+
+### Added
+
+- **`docker-compose.yml`**: ambiente di sviluppo locale con `ghcr.io/blacksoulgem95/fossbilling-railway:latest` e MySQL 8.0. Il file `OpenProvider.php` viene montato direttamente da `./library/Registrar/Adapter/` per sviluppo live senza rebuild.
+
+## 2026-04-07
 
 ### Changed
 

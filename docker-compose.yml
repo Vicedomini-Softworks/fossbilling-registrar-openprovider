@@ -1,0 +1,36 @@
+services:
+  fossbilling:
+    image: ghcr.io/blacksoulgem95/fossbilling-railway:latest
+    ports:
+      - "8080:8080"
+    environment:
+      PORT: "8080"
+    volumes:
+      - fossbilling_data:/app
+      - ./library/Registrar/Adapter/OpenProvider.php:/app/library/Registrar/Adapter/OpenProvider.php
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+
+  db:
+    image: mysql:8.0
+    environment:
+      MYSQL_ROOT_PASSWORD: rootpassword
+      MYSQL_DATABASE: fossbilling
+      MYSQL_USER: fossbilling
+      MYSQL_PASSWORD: fossbilling
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-ufossbilling", "-pfossbilling"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+volumes:
+  fossbilling_data:
+  mysql_data:
