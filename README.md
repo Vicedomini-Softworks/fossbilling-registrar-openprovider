@@ -71,3 +71,4 @@ This project is licensed under the Apache 2.0 License. See the [LICENSE](LICENSE
 
 1. [OpenProvider](https://www.openprovider.com/) for their robust API.
 1. [FOSSBilling](https://fossbilling.org/) for their open-source billing platform.
+1. [Devife](https://github.com/devife/fossbilling-registrar-openprovider) for the original plugin this fork started from.
