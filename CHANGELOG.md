@@ -2,6 +2,16 @@
 
 ## [Unreleased] - 2026-04-09
 
+### Added
+
+- **`library/Server/Manager/OpenProvider.php`**: nuovo Server Manager FOSSBilling per prodotti OpenProvider non-dominio. Supporta:
+  - `ssl` — certificati SSL via REST `/v1beta/ssl/...` (crea ordine, cancella, sincronizza stato, rinnova)
+  - `license_plesk` / `license_cloudlinux` — licenze software via API XML-RPC legacy
+  - `dns_zone` — zone DNS via REST `/v1beta/dns/...`
+  - Il tipo prodotto è configurato tramite il campo custom del pacchetto `product_type`
+- **Stub di test per Server Manager** (`tests/Stubs/Server_Manager.php`, `Server_Account.php`, `Server_Package.php`, `Server_Client.php`, `Server_Exception.php`)
+- **Suite di 33 test** (`tests/ServerManagerTest.php`) che coprono tutti i metodi e i tipi prodotto supportati; suite completa ora a 79 test
+
 ### Fixed
 
 - **`getDomainDetails`: gestione `admin_handle` null**: fallback su `owner_handle` se `admin_handle` è assente; skip idratazione contatti se entrambi i campi sono null, evitando `TypeError` su domini senza handle amministrativo.
